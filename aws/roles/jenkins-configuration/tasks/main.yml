@@ -1,0 +1,286 @@
+---
+- name: Include default variables
+  ansible.builtin.include_vars:
+    file: ../../vars/main.yml
+
+- name: Run apt update
+  ansible.builtin.command: sudo apt-get update -y
+  changed_when: false
+
+- name: Stop nginx
+  ansible.builtin.service:
+    name: nginx
+    state: stopped
+  become: true
+  register: stopnginx
+  changed_when: "'active' in stopnginx.status.ActiveState"
+
+# - name: Request certificate using Certbot
+#   ansible.builtin.command: certbot certonly --standalone --preferred-challenges http -d {{ sub_domain }} --test-cert --non-interactive --agree-tos -m {{ emailid }}
+#   become: true
+#   register: request_certificate
+#   changed_when: "not 'Certificate not yet due for renewal' in request_certificate.stdout"
+
+- name: Configure certificate on ngnix
+  ansible.builtin.command: certbot --nginx -n -d {{ sub_domain }} --agree-tos -m {{ emailid }} --redirect
+  become: true
+  register: configure_certificate
+  changed_when: "not 'Successfully deployed certificate' in configure_certificate.stdout"
+
+- name: Remove the default file from sites-enabled
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    force: yes
+    state: absent
+  become: true
+
+- name: Check if file exists
+  stat:
+    path: /etc/nginx/sites-enabled/{{ sub_domain }}
+  register: file_stat
+
+- name: Create domain file in sites enabled
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/{{ sub_domain }}
+    state: touch
+    mode: '0644'
+  become: true
+  changed_when: "not file_stat.stat.exists"
+
+- name: Copy config template to domain file
+  ansible.builtin.template:
+    src: server.config.j2
+    dest: "/etc/nginx/sites-enabled/{{ sub_domain }}"
+    owner: root
+    group: root
+    mode: '0644'
+  become: true
+  changed_when: false
+
+- name: Kill nginx process
+  ansible.builtin.command: pkill -f nginx
+  changed_when: false
+  become: true
+
+- name: Reload Nginx
+  ansible.builtin.service:
+    name: nginx
+    state: restarted
+  become: true
+  register: rsngnix
+  changed_when: "'inactive' in rsngnix.status.ActiveState"
+
+- name: Disable jenkins setup wizard
+  lineinfile:
+    path: /etc/default/jenkins
+    line: JAVA_ARGS="-Djava.awt.headless=true -Djenkins.install.runSetupWizard=false"
+  become: yes
+
+- name: Create new groovy init
+  file:
+    path: /var/lib/jenkins/init.groovy.d
+    state: directory
+    mode: '0777'
+  become: yes
+
+- name: Put basic-security.groovy file into init.groovy.d path
+  ansible.builtin.template:
+    src:  basic-security.groovy
+    dest: "/var/lib/jenkins/init.groovy.d"
+    owner: root
+    group: root
+    mode: '0777'
+  become: true
+  changed_when: false
+
+- name: Start jenkins service
+  service:
+    name: jenkins
+    enabled: yes
+    state: started
+
+# - name: Include wait for jenkins task
+#   include_tasks: jenkins_check.yml
+
+- name: Wait for Jenkins service to start
+  wait_for: port=8080
+
+- name: Restart jenkins service
+  become: yes
+  service:
+    name: jenkins
+    state: restarted
+
+- name: Wait for Jenkins
+  wait_for: port=8080
+
+- name: Download jenkins cli into ubuntu home directory
+  become: yes
+  get_url:
+    url: http://localhost:8080/jnlpJars/jenkins-cli.jar
+    dest: /home/ubuntu
+    mode: '0777'
+  retries: 5
+  delay: 5
+  register: download
+  until: download is succeeded
+
+- name: Install necessary plugins
+  jenkins_plugin:
+    name: "{{ item }}"
+    url_username: "{{ juser }}"
+    url_password: "{{ jpassword }}"
+    # url: http://localhost:8080
+  register: plugins_script
+  with_items:
+    - envinject
+    - docker-plugin
+    - docker-commons
+    - docker-workflow
+    - docker-java-api
+    - nodejs
+    - branch-api
+    - checks-api
+    - credentials
+    - credentials-binding
+    - git
+    - git-client
+    - git-server
+    - github
+    - github-api
+    - github-branch-source
+    - pipeline-build-step
+    - pipeline-github-lib
+    - pipeline-graph-analysis
+    - pipeline-input-step
+    - pipeline-milestone-step
+    - pipeline-model-api
+    - pipeline-model-definition
+    - pipeline-model-extensions
+    - pipeline-rest-api
+    - pipeline-stage-step
+    - pipeline-stage-tags-metadata
+    - pipeline-stage-view
+    - plain-credentials
+    - plugin-util-api
+    - resource-disposer
+    - scm-api
+    - timestamper
+    - workflow-aggregator
+    - workflow-api
+    - workflow-basic-steps
+    - workflow-cps
+    - workflow-cps-global-lib
+    - workflow-durable-task-step
+    - workflow-job
+    - workflow-multibranch
+    - workflow-scm-step
+    - workflow-step-api
+    - workflow-support
+    - ws-cleanup
+
+- name: Restart jenkins service
+  service:
+    name: jenkins
+    state: restarted
+  become: yes
+
+- name: Remove groovy init file
+  file:
+    path: "/var/lib/jenkins/init.groovy.d/basic-security.groovy"
+    state: absent
+  become: yes
+
+- name: Get crumb
+  uri:
+    url: 'http://localhost:8080/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,":",//crumb)'
+    url_username : "{{ juser }}"
+    url_password : "{{ jpassword }}"
+    force_basic_auth: yes
+    return_content: yes
+  register: crumb
+
+- debug:
+    msg: "{{ crumb.content.split(':')[1] }}"
+
+# - name: Copy environment j2 file to /var/tmp
+#   ansible.builtin.template:
+#     src: envVars.properties.j2
+#     dest: "/home/ubuntu/envVars.properties"
+#     owner: root
+#     group: root
+#     mode: '0644'
+#   become: true
+#   changed_when: false
+
+- name: Download CLI jar
+  get_url:
+    url: "http://localhost:8080/jnlpJars/jenkins-cli.jar"
+    dest: /opt/jenkins-cli.jar
+  become: true
+
+# - name: Copy credential.xml.j2 file to home dir
+#   ansible.builtin.template:
+#     src: credentials.xml.j2
+#     dest: /home/ubuntu/
+#     mode: a+x
+#   register: copycredfile
+#   become: true
+
+# - name: Create secret credentials using j2 template
+#   shell: java -jar /opt/jenkins-cli.jar -auth "{{ juser }}":"{{ jpassword }}" -s http://localhost:8080/ create-credentials-by-xml system::system::jenkins _ < credentials.xml.j2
+#   become: true
+#   register: creds
+
+- name: Create a new job in jenkins dashboard using j2 template
+  jenkins_job:
+    config: "{{ lookup('template', 'templates/custom-job.xml.j2') }}"
+    name: "{{ job_name }}"
+    password: "{{ jpassword }}"
+    url: http://localhost:8080
+    user: "{{ juser }}"
+
+# - name: Copy Docker docker-credential.xml.j2 file to home dir
+#   ansible.builtin.template:
+#     src: docker-credential.xml.j2
+#     dest: /home/ubuntu/
+#     mode: a+x
+#   register: copydockercredfile
+#   become: true
+
+# - name: Create docker secret credentials using j2 template
+#   shell: java -jar /opt/jenkins-cli.jar -auth "{{ juser }}":"{{ jpassword }}" -s http://localhost:8080/ create-credentials-by-xml system::system::jenkins _ < docker-credential.xml.j2
+#   become: true
+#   register: dockercreds
+
+- name: Create a new web app job in jenkins dashboard using j2 template
+  jenkins_job:
+    config: "{{ lookup('template', 'templates/custom-job-webapp.xml.j2') }}"
+    name: "{{ web_job_name }}"
+    password: "{{ jpassword }}"
+    url: http://localhost:8080
+    user: "{{ juser }}"
+
+# - name: Create credential
+#   uri:
+#     method: POST
+#     url: 'http://localhost:8080/manage/credentials/store/system/domain/_/newCredentials'
+#     url_username: "{{ juser }}"
+#     url_password : "{{ jpassword }}"
+#     force_basic_auth: yes
+#     body: |
+#       json={
+#         "": "0",
+#         "credentials": {
+#           "scope": "GLOBAL",
+#           "id": "gitrepo",
+#           "secret": "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",
+#           "$class": "org.jenkinsci.plugins.plaincredentials.impl.StringCredentialsImpl"
+#         }
+#       }
+
+# - name: Print Jenkins Password
+#   ansible.builtin.command: cat /var/lib/jenkins/secrets/initialAdminPassword
+#   changed_when: false
+#   become: true
+

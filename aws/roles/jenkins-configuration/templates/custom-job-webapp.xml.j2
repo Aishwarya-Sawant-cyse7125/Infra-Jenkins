@@ -1,0 +1,65 @@
+<flow-definition plugin="workflow-job@1254.v3f64639b_11dd">
+<actions/>
+<description/>
+<keepDependencies>false</keepDependencies>
+<properties>
+<com.coravy.hudson.plugins.github.GithubProjectProperty plugin="github@1.36.0">
+<projectUrl>{{ web_git_url }}</projectUrl>
+<displayName/>
+</com.coravy.hudson.plugins.github.GithubProjectProperty>
+<EnvInjectJobProperty plugin="envinject@2.892.v25453b_80e595">
+<info>
+<propertiesContent>AWS_REGION={{ AWS_REGION }}
+KOPS_STATE_STORE={{ KOPS_STATE_STORE }}
+CLUSTER_NAME={{ CLUSTER_NAME }}
+dockerConfigJson={{ dockerConfigJson }}
+DbFlywayAddress={{ DbFlywayAddress }}
+DbAddress={{ DbAddress }}
+DbPassword={{ DbPassword }}
+ElasticUrl={{ ElasticUrl }}
+KafkaBroker={{ KafkaBroker }}
+DOCKER_REPO={{ DOCKER_REPO }}
+</propertiesContent>
+<secureGroovyScript plugin="script-security@1218.v39ca_7f7ed0a_c">
+<script/>
+<sandbox>false</sandbox>
+</secureGroovyScript>
+<loadFilesFromMaster>false</loadFilesFromMaster>
+</info>
+<on>true</on>
+<keepJenkinsSystemVariables>true</keepJenkinsSystemVariables>
+<keepBuildVariables>true</keepBuildVariables>
+<overrideBuildParameters>false</overrideBuildParameters>
+</EnvInjectJobProperty>
+<org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+<triggers>
+<com.cloudbees.jenkins.GitHubPushTrigger plugin="github@1.36.0">
+<spec/>
+</com.cloudbees.jenkins.GitHubPushTrigger>
+</triggers>
+</org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+</properties>
+<definition class="org.jenkinsci.plugins.workflow.cps.CpsScmFlowDefinition" plugin="workflow-cps@3565.v4b_d9b_8c29a_b_3">
+<scm class="hudson.plugins.git.GitSCM" plugin="git@4.14.2">
+<configVersion>2</configVersion>
+<userRemoteConfigs>
+<hudson.plugins.git.UserRemoteConfig>
+<url>{{ web_git_url }}</url>
+<credentialsId>{{ credential_id }}</credentialsId>
+</hudson.plugins.git.UserRemoteConfig>
+</userRemoteConfigs>
+<branches>
+<hudson.plugins.git.BranchSpec>
+<name>*/{{ git_branch }}</name>
+</hudson.plugins.git.BranchSpec>
+</branches>
+<doGenerateSubmoduleConfigurations>false</doGenerateSubmoduleConfigurations>
+<submoduleCfg class="empty-list"/>
+<extensions/>
+</scm>
+<scriptPath>{{ jenkins_script_file }}</scriptPath>
+<lightweight>false</lightweight>
+</definition>
+<triggers/>
+<disabled>false</disabled>
+</flow-definition>

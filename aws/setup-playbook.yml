@@ -1,0 +1,15 @@
+---
+- name: "Setup AWS infra"
+  hosts: localhost
+  gather_facts: no
+  roles:
+  - network-setup
+
+- name: "Jenkins Configuration"
+  hosts: aws_ssh
+  gather_facts: no
+  # vars:
+  #   sub_domain: "{{ sub_domain }}"
+  #   emailid: "{{ email_id }}"
+  roles:
+  - jenkins-configuration

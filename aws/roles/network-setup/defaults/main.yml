@@ -1,0 +1,22 @@
+---
+aws_profile: root
+aws_region: us-east-1
+vpc_name: "jenkins-{{ aws_region }}-vpc"
+vpc_cidr_block: 20.0.0.0/16
+vpc_subnets:
+  private_subnet_1:
+    cidr_block: 20.0.1.0/24
+    az: "{{ aws_region }}a"
+  private_subnet_2:
+    cidr_block: 20.0.2.0/24
+    az: "{{ aws_region }}b"
+  private_subnet_3:
+    cidr_block: 20.0.3.0/24
+    az: "{{ aws_region }}c"
+ec2_key_name: ""
+instance_type: ""
+env: jenkins
+domain_name: ""
+sub_domain: ""
+group_name: ""
+ami_id: ami-052efd3df9dad4825

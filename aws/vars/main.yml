@@ -1,0 +1,31 @@
+---
+juser: ""
+jpassword: ""
+sub_domain: ""
+emailid: ""
+# jenkins_plugins: ["github", "git", "cloudbees-credentials", "credentials"]
+job_name: ""
+git_url: https://github.com/cyse7125-fall2022-group02/helm-chart.git/
+git_branch: main
+jenkins_script_file: ""
+credential_id: ""
+cred_uname: ""
+cred_token: ""
+web_job_name: ""
+web_git_url: https://github.com/cyse7125-fall2022-group02/webapp.git
+docker_cred_name: ""
+docker_token: ""
+docker_credential_id: ""
+
+AWS_ACCESS_KEY_ID: ""
+AWS_SECRET_ACCESS_KEY: ""
+AWS_REGION: us-east-1
+KOPS_STATE_STORE: ""
+CLUSTER_NAME: ""
+dockerConfigJson: ""
+DbFlywayAddress: ""
+DbAddress: ""
+DbPassword: ""
+KafkaBroker: ""
+ElasticUrl: ""
+DOCKER_REPO: csye7125project/webapplication
